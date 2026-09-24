@@ -1,0 +1,10 @@
+name = "deposito-principal"
+pages_build_output_dir = "./public"
+
+# Crear un namespace KV y completar el id, o configurarlo desde el Dashboard.
+[[kv_namespaces]]
+binding = "APP_KV"
+id = "REEMPLAZAR_CON_KV_NAMESPACE_ID"
+
+# ADMIN_PASSWORD y SESSION_SECRET deben cargarse como secretos/variables en Cloudflare,
+# no escribirlos en este archivo ni en index.html.
