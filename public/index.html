@@ -51,6 +51,19 @@ main{padding:12px;max-width:1500px;margin:auto}.kpis{display:grid;grid-template-
 .admin-msg{font-size:13px;color:#45535f}
 .upload-note{font-size:12px;color:#66717c;margin-top:4px}
 
+
+.filter-tools{grid-template-columns:repeat(3,minmax(0,1fr)) auto}
+.filter-tools>div{min-width:0}
+.filter-tools .search-status{grid-column:1/-1}
+@media(max-width:900px){
+  .filter-tools{grid-template-columns:1fr 1fr}
+  .filter-tools button{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .filter-tools{grid-template-columns:1fr}
+  .filter-tools button{grid-column:auto}
+}
+
 </style>
 </head>
 <body>
@@ -62,14 +75,20 @@ main{padding:12px;max-width:1500px;margin:auto}.kpis{display:grid;grid-template-
 </div>
 </header>
 <main>
-<div class="notice">En el visor de archivos del iPhone se muestra el mapa, pero cargar una nueva LX02 requiere abrir esta página en un navegador que ejecute JavaScript.</div>
-
-<section class="material-tools">
+<section class="material-tools filter-tools">
   <div>
-    <label for="materialFilter">Buscar por código de material</label>
+    <label for="materialFilter">Código de material</label>
     <input id="materialFilter" inputmode="numeric" placeholder="Ej.: 807">
   </div>
-  <button id="clearMaterial" type="button">Limpiar</button>
+  <div>
+    <label for="nameFilter">Nombre del material</label>
+    <input id="nameFilter" type="text" placeholder="Ej.: LACOSAMIDA">
+  </div>
+  <div>
+    <label for="lotFilter">Lote</label>
+    <input id="lotFilter" type="text" placeholder="Ej.: 40027589">
+  </div>
+  <button id="clearFilters" type="button">Limpiar filtros</button>
   <div class="search-status" id="searchStatus"></div>
 </section>
 
@@ -157,27 +176,61 @@ function normalizedMaterial(v){
   return d?String(parseInt(d,10)):s.toUpperCase();
 }
 function materialMatches(a,b){return normalizedMaterial(a)===normalizedMaterial(b)}
+function textMatch(value, query){
+  return String(value??"").toUpperCase().includes(String(query??"").trim().toUpperCase());
+}
 function refresh(){
-  const q=document.getElementById("materialFilter")?.value.trim()||"";
+  const materialQ=document.getElementById("materialFilter")?.value.trim()||"";
+  const nameQ=document.getElementById("nameFilter")?.value.trim()||"";
+  const lotQ=document.getElementById("lotFilter")?.value.trim()||"";
+  const hasFilters=!!(materialQ||nameQ||lotQ);
   let hits=0;
+
   document.querySelectorAll(".loc[data-loc]").forEach(b=>{
     const loc=b.dataset.loc, st=stateOf(loc), rs=rowsAt(loc);
     b.className="loc "+cclass(st);
-    if(q){
-      const hit=rs.some(r=>materialMatches(r.material,q));
-      if(hit){b.classList.add("material-hit");hits++;}
-      else b.classList.add("dimmed");
+
+    if(hasFilters){
+      const hit=rs.some(r=>{
+        const materialOK=!materialQ || materialMatches(r.material,materialQ);
+        const nameOK=!nameQ || textMatch(r.texto,nameQ);
+        const lotOK=!lotQ || textMatch(r.lote,lotQ);
+        return materialOK && nameOK && lotOK;
+      });
+
+      if(hit){
+        b.classList.add("material-hit");
+        hits++;
+      }else{
+        b.classList.add("dimmed");
+      }
     }
   });
+
   const status=document.getElementById("searchStatus");
-  if(status) status.textContent=q ? (hits ? `Material ${q}: ${hits} ubicación${hits===1?"":"es"}.` : `No se encontraron posiciones para el material ${q}.`) : "";
+  if(status){
+    if(!hasFilters){
+      status.textContent="";
+    }else if(hits){
+      status.textContent=`${hits} ubicación${hits===1?"":"es"} encontrada${hits===1?"":"s"}.`;
+    }else{
+      status.textContent="No se encontraron ubicaciones con esos filtros.";
+    }
+  }
   renderKpis();
 }
 function renderKpis(){function sum(kind){const ls=MASTER.filter(x=>wh(x)===kind);let c={LIBRE:0,Q:0,S:0,OCUPADA:0,LIMITED:0};ls.forEach(x=>c[stateOf(x)]++);return{t:ls.length,o:ls.length-c.LIBRE,l:c.LIBRE,q:c.Q,s:c.S}}const a=sum("MP"),b=sum("PT");document.getElementById("kpis").innerHTML=`<div class="kpi"><strong>${a.o} / ${a.t}</strong><small>MP ocupadas / total</small></div><div class="kpi"><strong>${a.l}</strong><small>MP libres</small></div><div class="kpi"><strong>${a.q} / ${a.s}</strong><small>MP Q / S</small></div><div class="kpi"><strong>${b.o} / ${b.t}</strong><small>PT ocupadas / total</small></div><div class="kpi"><strong>${b.l}</strong><small>PT libres</small></div>`}
 function detail(loc){const s=stateOf(loc),rs=rowsAt(loc);const displayState=s==="LIBRE"?"UBICACIÓN LIBRE":s==="OCUPADA"?"MATERIAL LIBRE UTILIZACIÓN":s==="LIMITED"?"MATERIAL UTILIZACIÓN LIMITADA":s;let h=`<h3>Ubicación ${loc}</h3><p><span class="badge ${cclass(s)}">${displayState}</span> · ${wh(loc)}</p>`;h+=rs.length?rs.map(r=>`<div class="record"><div><b>Material:</b> ${r.material}</div><div><b>Descripción:</b> ${r.texto}</div><div><b>Lote:</b> ${r.lote}</div><div><b>Stock:</b> ${r.stock} ${r.unidad}</div><div><b>Estado SAP:</b> ${r.dif||"Normal"}</div></div>`).join(""):"<p>La ubicación está libre.</p>";document.getElementById("details").innerHTML=h;document.getElementById("details").scrollIntoView({behavior:"smooth",block:"nearest"})}
 document.querySelectorAll(".loc[data-loc]").forEach(b=>b.addEventListener("click",()=>detail(b.dataset.loc)));
-document.getElementById("materialFilter").addEventListener("input",refresh);
-document.getElementById("clearMaterial").addEventListener("click",()=>{document.getElementById("materialFilter").value="";refresh();});
+["materialFilter","nameFilter","lotFilter"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",refresh);
+});
+document.getElementById("clearFilters").addEventListener("click",()=>{
+  document.getElementById("materialFilter").value="";
+  document.getElementById("nameFilter").value="";
+  document.getElementById("lotFilter").value="";
+  refresh();
+});
 
 
 async function loadCentralData(){
