@@ -299,9 +299,7 @@ async function loadCentralData(){
         lxOk=true;
       }
     }
-  }catch(e){
-    console.error("Error cargando LX02 central:",e);
-  }
+  }catch(e){}
 
   try{
     const r=await fetch("/api/mb52",{cache:"no-store"});
@@ -356,31 +354,27 @@ async function checkAdmin(){
     document.getElementById("configBox").hidden=!j.authenticated;
   }catch(e){}
 }
-
 document.getElementById("adminLogin").addEventListener("click",async()=>{
   const password=document.getElementById("adminPassword").value;
   const msg=document.getElementById("loginMsg");
   msg.textContent="Verificando…";
-
   try{
-    const r=await fetch("/api/login",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({password})
-    });
-
+    const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});
     if(!r.ok) throw new Error("Contraseña incorrecta.");
-
     msg.textContent="";
     document.getElementById("adminPassword").value="";
     await checkAdmin();
-  }catch(e){
-    msg.textContent=e.message;
-  }
+    await   }catch(e){msg.textContent=e.message;}
 });
-
+if(!r.ok) throw new Error((await r.text())||"No se pudo guardar.");
+    appConfig={limitedCode};
+    msg.textContent="Configuración guardada.";
+    refresh();
+  }catch(e){msg.textContent=e.message;}
+});
 document.getElementById("adminLogout").addEventListener("click",async()=>{
   await fetch("/api/logout",{method:"POST"});
+  document.getElementById("configMsg").textContent="";
   await checkAdmin();
 });
 
